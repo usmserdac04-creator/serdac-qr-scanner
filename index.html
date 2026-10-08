@@ -72,13 +72,8 @@
       background: #ffebee !important;
     }
 
-    button {
-      margin-top: 15px;
-      padding: 12px 20px;
-      border: none;
-      border-radius: 8px;
-      font-size: 16px;
-      cursor: pointer;
+    .checking {
+      background: #fff8e1 !important;
     }
 
   </style>
@@ -98,7 +93,7 @@
     <div id="reader"></div>
 
     <div id="result">
-      📷 Waiting for camera...
+      📷 Camera ready — scan a SERDAC QR code.
     </div>
 
   </div>
@@ -108,15 +103,21 @@
 
     let lastScanned = "";
     let lastScanTime = 0;
+    let processing = false;
+
 
     function onScanSuccess(decodedText, decodedResult) {
 
+      if (processing) {
+        return;
+      }
+
       const now = Date.now();
 
-      // Prevent repeated detection of the same QR
+      // Prevent repeated scanning
       if (
         decodedText === lastScanned &&
-        now - lastScanTime < 3000
+        now - lastScanTime < 5000
       ) {
         return;
       }
@@ -126,22 +127,117 @@
 
       const result = document.getElementById("result");
 
-      result.className = "success";
+      /*
+       * Check whether the QR contains a URL.
+       */
+
+      let url;
+
+      try {
+
+        url = new URL(decodedText);
+
+      } catch (error) {
+
+        result.className = "error";
+
+        result.innerHTML =
+          "❌ INVALID SERDAC QR<br><br>" +
+          "The QR code does not contain a valid URL.";
+
+        return;
+      }
+
+
+      /*
+       * SERDAC QR SECURITY CHECK
+       *
+       * Only allow:
+       *
+       * https://script.google.com/macros/s/....../exec
+       *
+       * with:
+       *
+       * ?client=SERDAC-XXXX
+       */
+
+      const validHost =
+        url.hostname === "script.google.com";
+
+      const validPath =
+        /^\/macros\/s\/[^\/]+\/exec$/.test(url.pathname);
+
+      const client =
+        url.searchParams.get("client");
+
+      const validClient =
+        client &&
+        /^SERDAC-\d+$/i.test(client);
+
+
+      /*
+       * Reject anything that is not a SERDAC QR.
+       */
+
+      if (
+        !validHost ||
+        !validPath ||
+        !validClient
+      ) {
+
+        result.className = "error";
+
+        result.innerHTML =
+          "❌ INVALID SERDAC QR<br><br>" +
+          "This QR code is not a recognized SERDAC QR.";
+
+        return;
+      }
+
+
+      /*
+       * Valid SERDAC QR
+       */
+
+      processing = true;
+
+      result.className = "checking";
 
       result.innerHTML =
-        "<strong>✅ QR CODE DETECTED</strong><br><br>" +
-        decodedText;
+        "✅ SERDAC QR VERIFIED<br><br>" +
+        "Client: <strong>" +
+        client +
+        "</strong><br><br>" +
+        "Opening Check-In...";
 
-      console.log("QR Data:", decodedText);
+
+      /*
+       * Stop the camera before opening
+       * the existing SERDAC URL.
+       */
+
+      const targetURL = url.toString();
+
+      setTimeout(function() {
+
+        window.location.href = targetURL;
+
+      }, 800);
+
     }
 
 
     function onScanFailure(error) {
-      // Ignore continuous scanning errors
+      // Ignore normal continuous scanning errors
     }
 
 
-    const scanner = new Html5Qrcode("reader");
+    /*
+     * Start scanner
+     */
+
+    const scanner =
+      new Html5Qrcode("reader");
 
 
     Html5Qrcode.getCameras()
@@ -149,6 +245,9 @@
       .then(function(devices) {
 
         if (!devices || devices.length === 0) {
+
+          document.getElementById("result").className =
+            "error";
 
           document.getElementById("result").innerHTML =
             "❌ No camera detected.";
@@ -158,7 +257,9 @@
         }
 
 
-        // Prefer the rear camera
+        /*
+         * Prefer the rear camera.
+         */
 
         let cameraId = devices[0].id;
 
@@ -174,6 +275,7 @@
           ) {
 
             cameraId = devices[i].id;
+
             break;
 
           }
@@ -203,7 +305,7 @@
         .then(function() {
 
           document.getElementById("result").innerHTML =
-            "📷 Camera ready — scan a QR code.";
+            "📷 Camera ready — scan a SERDAC QR code.";
 
         })
 
