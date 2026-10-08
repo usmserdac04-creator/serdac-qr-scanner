@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1">
+
+  <title>SERDAC QR Scanner</title>
+
+  <script src="https://unpkg.com/html5-qrcode"
+          type="text/javascript">
+  </script>
+
+  <style>
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .container {
+      width: 95%;
+      max-width: 500px;
+      background: white;
+      padding: 24px;
+      border-radius: 18px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+      text-align: center;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 26px;
+    }
+
+    .subtitle {
+      margin-bottom: 20px;
+      color: #666;
+    }
+
+    #reader {
+      width: 100%;
+      overflow: hidden;
+      border-radius: 12px;
+    }
+
+    #result {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 10px;
+      background: #f1f1f1;
+      word-break: break-word;
+      font-size: 16px;
+    }
+
+    .success {
+      background: #e8f5e9 !important;
+    }
+
+    .error {
+      background: #ffebee !important;
+    }
+
+    button {
+      margin-top: 15px;
+      padding: 12px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+  </style>
+
+</head>
+
+<body>
+
+  <div class="container">
+
+    <h1>📱 SERDAC QR Scanner</h1>
+
+    <div class="subtitle">
+      Scan a SERDAC QR code
+    </div>
+
+    <div id="reader"></div>
+
+    <div id="result">
+      📷 Waiting for camera...
+    </div>
+
+  </div>
+
+
+  <script>
+
+    let lastScanned = "";
+    let lastScanTime = 0;
+
+    function onScanSuccess(decodedText, decodedResult) {
+
+      const now = Date.now();
+
+      // Prevent repeated detection of the same QR
+      if (
+        decodedText === lastScanned &&
+        now - lastScanTime < 3000
+      ) {
+        return;
+      }
+
+      lastScanned = decodedText;
+      lastScanTime = now;
+
+      const result = document.getElementById("result");
+
+      result.className = "success";
+
+      result.innerHTML =
+        "<strong>✅ QR CODE DETECTED</strong><br><br>" +
+        decodedText;
+
+      console.log("QR Data:", decodedText);
+    }
+
+
+    function onScanFailure(error) {
+      // Ignore continuous scanning errors
+    }
+
+
+    const scanner = new Html5Qrcode("reader");
+
+
+    Html5Qrcode.getCameras()
+
+      .then(function(devices) {
+
+        if (!devices || devices.length === 0) {
+
+          document.getElementById("result").innerHTML =
+            "❌ No camera detected.";
+
+          return;
+
+        }
+
+
+        // Prefer the rear camera
+
+        let cameraId = devices[0].id;
+
+        for (let i = 0; i < devices.length; i++) {
+
+          const label =
+            devices[i].label.toLowerCase();
+
+          if (
+            label.includes("back") ||
+            label.includes("rear") ||
+            label.includes("environment")
+          ) {
+
+            cameraId = devices[i].id;
+            break;
+
+          }
+
+        }
+
+
+        scanner.start(
+
+          cameraId,
+
+          {
+            fps: 10,
+
+            qrbox: {
+              width: 250,
+              height: 250
+            }
+          },
+
+          onScanSuccess,
+
+          onScanFailure
+
+        )
+
+        .then(function() {
+
+          document.getElementById("result").innerHTML =
+            "📷 Camera ready — scan a QR code.";
+
+        })
+
+        .catch(function(error) {
+
+          document.getElementById("result").className =
+            "error";
+
+          document.getElementById("result").innerHTML =
+            "❌ Unable to start camera:<br>" +
+            error;
+
+        });
+
+      })
+
+      .catch(function(error) {
+
+        document.getElementById("result").className =
+          "error";
+
+        document.getElementById("result").innerHTML =
+          "❌ Camera access failed:<br>" +
+          error;
+
+      });
+
+  </script>
+
+</body>
+
+</html>
